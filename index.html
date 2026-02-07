@@ -492,10 +492,19 @@
                     if(p.isRemote && p.inShop) continue; // can't hit players in shop
                     if(Math.hypot(p.x-s.x,p.y-s.y)<p.r+s.radius) {
                         if(isMultiplayer && p.isRemote) {
-                            // Send hit to server, don't apply locally
+                            // Send hit to server, don't apply locally to target
                             const kill = p.hp - s.dmg <= 0;
                             netSend({t:'hit', targetId:p.playerId, dmg:s.dmg, kill});
-                            // Still show particles locally
+                            // Award diamonds/score to attacker (me) locally
+                            if(s.owner && s.owner.local) {
+                                s.owner.diamonds += DIAMONDS_PER_HIT;
+                                floatingTexts.push({ x:s.owner.x, y:s.owner.y-30, text:'+'+DIAMONDS_PER_HIT, color:'#7dd3fc', life:40, ml:40 });
+                                if(kill) {
+                                    s.owner.score++;
+                                    s.owner.diamonds += DIAMONDS_PER_KILL;
+                                    floatingTexts.push({ x:s.owner.x, y:s.owner.y-45, text:'+'+DIAMONDS_PER_KILL+' KILL!', color:'#fbbf24', life:60, ml:60, big:true });
+                                }
+                            }
                         } else if(isMultiplayer && p.local) {
                             // Local player hit by own bot (host) - apply directly
                             p.hit(s.dmg, s.owner);
@@ -508,8 +517,18 @@
                                 if(p2===s.owner||!p2.alive||p2===p) continue;
                                 if(Math.hypot(p2.x-s.x,p2.y-s.y)<s.aoe) {
                                     if(isMultiplayer && p2.isRemote) {
-                                        const kill2 = p2.hp - Math.floor(s.dmg*0.5) <= 0;
-                                        netSend({t:'hit', targetId:p2.playerId, dmg:Math.floor(s.dmg*0.5), kill:kill2});
+                                        const splashDmg = Math.floor(s.dmg*0.5);
+                                        const kill2 = p2.hp - splashDmg <= 0;
+                                        netSend({t:'hit', targetId:p2.playerId, dmg:splashDmg, kill:kill2});
+                                        if(s.owner && s.owner.local) {
+                                            s.owner.diamonds += DIAMONDS_PER_HIT;
+                                            floatingTexts.push({ x:s.owner.x, y:s.owner.y-30, text:'+'+DIAMONDS_PER_HIT, color:'#7dd3fc', life:40, ml:40 });
+                                            if(kill2) {
+                                                s.owner.score++;
+                                                s.owner.diamonds += DIAMONDS_PER_KILL;
+                                                floatingTexts.push({ x:s.owner.x, y:s.owner.y-45, text:'+'+DIAMONDS_PER_KILL+' KILL!', color:'#fbbf24', life:60, ml:60, big:true });
+                                            }
+                                        }
                                     } else {
                                         p2.hit(Math.floor(s.dmg*0.5),s.owner);
                                     }
