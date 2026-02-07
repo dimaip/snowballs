@@ -228,6 +228,13 @@
             icon: '\u{1F47B}', iconBg: '#1a5050', // ghost
             phase: true,
         },
+        ricochet: {
+            name: 'Ricochet', desc: 'Bounces off walls and obstacles up to 3 times.',
+            cost: 9, dmg: 16, speed: 10, cd: 350, radius: 5,
+            color: '#ff9060', color2: '#c05030', trail: '#ff7040',
+            icon: '\u{1F4A5}', iconBg: '#703020', // collision
+            bounces: 3,
+        },
     };
 
     // ===== STATE =====
@@ -461,7 +468,7 @@
                 sbType: p.equipped, radius: t.radius,
                 color: t.color, color2: t.color2, trailColor: t.trail,
                 pierce: t.pierce || 0, homing: !!t.homing,
-                slowZone: !!t.slowZone, aoe: t.aoe || 0, phase: !!t.phase,
+                slowZone: !!t.slowZone, aoe: t.aoe || 0, phase: !!t.phase, bounces: t.bounces || 0,
             };
             snowballs.push(sb);
         }
@@ -560,12 +567,21 @@
             if(!hit) {
                 for(const b of buildings) { if(!b.solid) continue; if(s.x>b.x&&s.x<b.x+b.w&&s.y>b.y&&s.y<b.y+b.h) {
                     if(s.phase) {
-                        // Phase through — lose damage, show ghost particles
                         if(!s._lastPhaseB || s._lastPhaseB !== b) {
                             s._lastPhaseB = b;
                             s.dmg = Math.max(2, s.dmg - 4);
                             for(let j=0;j<4;j++) particles.push({x:s.x,y:s.y,vx:(Math.random()-0.5)*2,vy:(Math.random()-0.5)*2,life:10+Math.random()*8,ml:18,sz:1+Math.random()*2,t:'puff'});
                         }
+                    } else if(s.bounces > 0) {
+                        // Bounce off building wall — determine which face was hit
+                        const prevX=s.x-s.vx*dt, prevY=s.y-s.vy*dt;
+                        const fromLeft=prevX<=b.x, fromRight=prevX>=b.x+b.w;
+                        const fromTop=prevY<=b.y, fromBottom=prevY>=b.y+b.h;
+                        if(fromLeft||fromRight) s.vx=-s.vx; else s.vy=-s.vy;
+                        s.x+=s.vx*2; s.y+=s.vy*2; // nudge out
+                        s.bounces--;
+                        for(let j=0;j<6;j++) { const a=Math.random()*Math.PI*2,sp=1+Math.random()*2; particles.push({x:s.x,y:s.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:10+Math.random()*10,ml:20,sz:2+Math.random()*3,t:'burst'}); }
+                        break;
                     } else {
                         hit=true; if(s.slowZone) slowZones.push({x:s.x,y:s.y,radius:80,life:180,ml:180}); impacts.push({x:s.x,y:s.y,life:250,ml:250,sz:6+Math.random()*6}); for(let j=0;j<8;j++) particles.push({x:s.x,y:s.y,vx:(Math.random()-0.5)*3,vy:(Math.random()-0.5)*3,life:12+Math.random()*12,ml:24,sz:1+Math.random()*3,t:'puff'}); break;
                     }
@@ -574,10 +590,27 @@
             if(!hit) {
                 for(const t of trees) { if(Math.hypot(t.x-s.x,t.y-s.y)<14+s.radius) {
                     if(s.phase) { if(s._lastPhaseT!==t){s._lastPhaseT=t;s.dmg=Math.max(2,s.dmg-3);} }
+                    else if(s.bounces > 0) {
+                        // Bounce off tree — reflect away from center
+                        const nx=s.x-t.x, ny=s.y-t.y, nd=Math.hypot(nx,ny)||1;
+                        const dot=s.vx*(nx/nd)+s.vy*(ny/nd);
+                        s.vx-=2*dot*(nx/nd); s.vy-=2*dot*(ny/nd);
+                        s.x+=s.vx*2; s.y+=s.vy*2;
+                        s.bounces--;
+                        for(let j=0;j<5;j++) { const a=Math.random()*Math.PI*2,sp=1+Math.random()*2; particles.push({x:s.x,y:s.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:10+Math.random()*8,ml:18,sz:2+Math.random()*2,t:'burst'}); }
+                    }
                     else { hit=true; break; }
                 } }
                 for(const m of mounds) { if(Math.hypot(m.x-s.x,m.y-s.y)<m.radius+s.radius) {
                     if(s.phase) { if(s._lastPhaseM!==m){s._lastPhaseM=m;s.dmg=Math.max(2,s.dmg-3);} }
+                    else if(s.bounces > 0) {
+                        const nx=s.x-m.x, ny=s.y-m.y, nd=Math.hypot(nx,ny)||1;
+                        const dot=s.vx*(nx/nd)+s.vy*(ny/nd);
+                        s.vx-=2*dot*(nx/nd); s.vy-=2*dot*(ny/nd);
+                        s.x+=s.vx*2; s.y+=s.vy*2;
+                        s.bounces--;
+                        for(let j=0;j<5;j++) { const a=Math.random()*Math.PI*2,sp=1+Math.random()*2; particles.push({x:s.x,y:s.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:10+Math.random()*8,ml:18,sz:2+Math.random()*2,t:'burst'}); }
+                    }
                     else { hit=true; break; }
                 } }
             }
